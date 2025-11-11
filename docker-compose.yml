@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  client:
+    image: alpine
+    command: ["sh", "-c", "sleep infinity"]
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.2
+
+  vnf_classification:
+    build:
+      context: .
+      dockerfile: Dockerfile.classification
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.10
+
+  vnf_policing:
+    build:
+      context: .
+      dockerfile: Dockerfile.policing
+    privileged: true
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.11
+
+  vnf_monitoring:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitoring
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.12
+
+  server:
+    image: alpine
+    command: ["sh", "-c", "sleep infinity"]
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.20
+
+networks:
+  qos_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.0.0/24
