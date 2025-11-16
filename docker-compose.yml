@@ -1,44 +1,155 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  client:
-    image: alpine
-    command: ["sh", "-c", "sleep infinity"]
-    networks:
-      qos_net:
-        ipv4_address: 10.0.0.2
-
-  vnf_classification:
-    build:
-      context: .
-      dockerfile: Dockerfile.classification
+  # CLIENTS
+  client_voip:
+    build: ./clients
+    container_name: client_voip
     networks:
       qos_net:
         ipv4_address: 10.0.0.10
+    cap_add:
+      - NET_ADMIN
+    command: >
+      sh -c "
+      ip route del default 2>/dev/null || true;
+      ip route add default via 10.0.0.20;
+      sleep infinity
+      "
 
-  vnf_policing:
-    build:
-      context: .
-      dockerfile: Dockerfile.policing
-    privileged: true
+  client_video:
+    build: ./clients
+    container_name: client_video
     networks:
       qos_net:
         ipv4_address: 10.0.0.11
+    cap_add:
+      - NET_ADMIN
+    command: >
+      sh -c "
+      ip route del default 2>/dev/null || true;
+      ip route add default via 10.0.0.20;
+      sleep infinity
+      "
 
-  vnf_monitoring:
-    build:
-      context: .
-      dockerfile: Dockerfile.monitoring
+  client_data:
+    build: ./clients
+    container_name: client_data
     networks:
       qos_net:
         ipv4_address: 10.0.0.12
+    cap_add:
+      - NET_ADMIN
+    command: >
+      sh -c "
+      ip route del default 2>/dev/null || true;
+      ip route add default via 10.0.0.20;
+      sleep infinity
+      "
 
-  server:
-    image: alpine
-    command: ["sh", "-c", "sleep infinity"]
+  # VNF CHAIN
+  vnf_classification:
+    build: ./vnfs/classification
+    container_name: vnf_classification
     networks:
       qos_net:
         ipv4_address: 10.0.0.20
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./logs:/logs
+    environment:
+      - VNF_NAME=classification
+      - NEXT_HOP=10.0.0.21
+    depends_on:
+      - vnf_policing
+
+  vnf_policing:
+    build: ./vnfs/policing
+    container_name: vnf_policing
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.21
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./logs:/logs
+    environment:
+      - VNF_NAME=policing
+      - NEXT_HOP=10.0.0.22
+    depends_on:
+      - vnf_monitoring
+
+  vnf_monitoring:
+    build: ./vnfs/monitoring
+    container_name: vnf_monitoring
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.22
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./logs:/logs
+      - ./metrics:/metrics
+    ports:
+      - "9090:9090"
+    environment:
+      - VNF_NAME=monitoring
+      - NEXT_HOP=10.0.0.23
+    depends_on:
+      - vnf_scheduling
+
+  vnf_scheduling:
+    build: ./vnfs/scheduling
+    container_name: vnf_scheduling
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.23
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./logs:/logs
+    environment:
+      - VNF_NAME=scheduling
+      - NEXT_HOP=10.0.0.24
+    depends_on:
+      - vnf_access_control
+
+  vnf_access_control:
+    build: ./vnfs/access_control
+    container_name: vnf_access_control
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.24
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./logs:/logs
+    environment:
+      - VNF_NAME=access_control
+      - NEXT_HOP=10.0.0.100
+    depends_on:
+      - server
+
+  # SERVER
+  server:
+    build: ./server
+    container_name: server
+    networks:
+      qos_net:
+        ipv4_address: 10.0.0.100
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "5001:5001"
+      - "5004:5004/udp"
+      - "8080:8080"
+    command: sleep infinity
 
 networks:
   qos_net:
