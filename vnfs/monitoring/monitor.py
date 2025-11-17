@@ -1,14 +1,13 @@
 from scapy.all import *
+from scapy.layers.inet import IP, TCP, UDP
 import logging
 import sys
 import os
 import time
-import json
 from collections import defaultdict
-from datetime import datetime
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # MUDAR para DEBUG
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('/logs/monitoring.log'),
@@ -17,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('Monitoring-VNF')
 
-NEXT_HOP = os.environ.get('NEXT_HOP', '10.0.0.23')
+NEXT_HOP = os.environ.get('NEXT_HOP', '10.0.0.100')
 
 stats = {
     'total': 0,
@@ -29,6 +28,7 @@ stats = {
 
 
 def get_traffic_class(pkt):
+    """Identify traffic class from DSCP marking"""
     try:
         if pkt.haslayer(IP):
             dscp = pkt[IP].tos >> 2
@@ -36,8 +36,10 @@ def get_traffic_class(pkt):
                 return 'voip'
             elif dscp == 34:
                 return 'video'
-            else:
+            elif dscp == 0:
                 return 'data'
+            else:
+                return 'other'
     except:
         pass
     return 'unknown'
@@ -49,42 +51,55 @@ def monitor_and_forward(pkt):
         packet_size = len(pkt)
         stats['bytes'] += packet_size
 
-        # Classify
+        # Classify traffic
         traffic_class = get_traffic_class(pkt)
         stats['classes'][traffic_class]['packets'] += 1
         stats['classes'][traffic_class]['bytes'] += packet_size
 
-        # Forward
-        send(pkt, verbose=False)
+        # Forward packet
+        sendp(pkt, iface='eth0', verbose=False)
         stats['forwarded'] += 1
 
-        # Log every 1000 packets
-        if stats['total'] % 1000 == 0:
+        # Log every 500 packets
+        if stats['total'] % 500 == 0:
             elapsed = time.time() - stats['start_time']
-            throughput = (stats['bytes'] * 8) / elapsed / 1_000_000  # Mbps
+            throughput_mbps = (stats['bytes'] * 8) / elapsed / 1_000_000
 
             logger.info("=" * 60)
-            logger.info(f"Total: {stats['total']} packets | {stats['bytes']:,} bytes")
-            logger.info(f"Throughput: {throughput:.3f} Mbps")
-            logger.info(f"Classes: {dict(stats['classes'])}")
+            logger.info(f"Total Packets: {stats['total']:,} | Bytes: {stats['bytes']:,}")
+            logger.info(f"Throughput: {throughput_mbps:.2f} Mbps")
+            logger.info(f"Traffic Breakdown:")
+            for traffic_type, data in stats['classes'].items():
+                logger.info(f"  - {traffic_type.upper()}: "
+                            f"{data['packets']:,} packets | "
+                            f"{data['bytes']:,} bytes")
             logger.info("=" * 60)
 
     except Exception as e:
-        logger.error(f"Error: {e}")
+        if stats['total'] % 100 == 1:
+            logger.error(f"Error: {e}")
 
 
 def main():
     logger.info("=" * 60)
-    logger.info("Monitoring VNF started (FORWARDING MODE)")
+    logger.info("Monitoring VNF Started")
     logger.info("=" * 60)
     logger.info(f"Next hop: {NEXT_HOP}")
-    logger.info("Collecting metrics and forwarding...")
+    logger.info("Collecting network metrics...")
     logger.info("=" * 60)
 
     try:
-        sniff(iface='eth0', prn=monitor_and_forward, store=0)
+        sniff(iface='eth0', prn=monitor_and_forward, store=0, promisc=True)
     except KeyboardInterrupt:
-        logger.info(f"\nFinal stats: {stats}")
+        elapsed = time.time() - stats['start_time']
+        throughput_mbps = (stats['bytes'] * 8) / elapsed / 1_000_000
+
+        logger.info("\n" + "=" * 60)
+        logger.info("Monitoring VNF Stopped")
+        logger.info(f"Session Duration: {elapsed:.1f} seconds")
+        logger.info(f"Average Throughput: {throughput_mbps:.2f} Mbps")
+        logger.info(f"Final Statistics: {dict(stats['classes'])}")
+        logger.info("=" * 60)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     iptables \
     net-tools \
     procps \
+    traceroute \
+    inetutils-traceroute \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir scapy
@@ -15,7 +17,7 @@ RUN mkdir -p /logs /metrics /app
 
 COPY monitor.py /app/
 COPY forward.sh /app/
-RUN chmod +x /app/monitor.py /app/forward.sh
+RUN chmod +x /app/forward.sh
 
 WORKDIR /app
 

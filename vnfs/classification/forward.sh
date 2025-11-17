@@ -1,25 +1,30 @@
+#!/bin/bash
 echo "=========================================="
-echo "Configuring IP forwarding for $VNF_NAME"
+echo "Configuring network for $VNF_NAME"
 echo "=========================================="
 
-# Enable IP forwarding
-sysctl -w net.ipv4.ip_forward=1
-sysctl -w net.ipv4.conf.all.forwarding=1
-sysctl -w net.ipv4.conf.default.forwarding=1
+# Verificar se estamos em container privilegiado
+if [ -w /proc/sys/net/ipv4/ip_forward ]; then
+    # Enable IP forwarding
+    sysctl -w net.ipv4.ip_forward=1
+    sysctl -w net.ipv4.conf.all.forwarding=1
+    sysctl -w net.ipv4.conf.default.forwarding=1
 
-# Disable reverse path filtering
-sysctl -w net.ipv4.conf.all.rp_filter=0
-sysctl -w net.ipv4.conf.default.rp_filter=0
-sysctl -w net.ipv4.conf.eth0.rp_filter=0
+    # Disable reverse path filtering
+    sysctl -w net.ipv4.conf.all.rp_filter=0
+    sysctl -w net.ipv4.conf.default.rp_filter=0
+    sysctl -w net.ipv4.conf.eth0.rp_filter=0
 
-# Enable proxy ARP
-sysctl -w net.ipv4.conf.all.proxy_arp=1
+    # Enable proxy ARP
+    sysctl -w net.ipv4.conf.all.proxy_arp=1
 
-# Disable ICMP redirects
-sysctl -w net.ipv4.conf.all.send_redirects=0
-sysctl -w net.ipv4.conf.eth0.send_redirects=0
-
-echo "IP forwarding enabled!"
+    # Disable ICMP redirects
+    sysctl -w net.ipv4.conf.all.send_redirects=0
+    sysctl -w net.ipv4.conf.eth0.send_redirects=0
+    echo "Network parameters configured!"
+else
+    echo "Running without sysctl permissions - using existing configuration"
+fi
 
 # Add route to next VNF
 if [ -n "$NEXT_HOP" ]; then
@@ -39,5 +44,5 @@ echo "Network interfaces:"
 ip addr show eth0
 echo ""
 echo "IP forwarding status:"
-sysctl net.ipv4.ip_forward
+cat /proc/sys/net/ipv4/ip_forward
 echo "=========================================="

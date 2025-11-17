@@ -14,6 +14,8 @@ services:
       sh -c "
       ip route del default 2>/dev/null || true;
       ip route add default via 10.0.0.20;
+      # Remover rota direta para server se existir
+      ip route del 10.0.0.100/32 2>/dev/null || true;
       sleep infinity
       "
 
@@ -29,6 +31,7 @@ services:
       sh -c "
       ip route del default 2>/dev/null || true;
       ip route add default via 10.0.0.20;
+      ip route del 10.0.0.100/32 2>/dev/null || true;
       sleep infinity
       "
 
@@ -44,10 +47,11 @@ services:
       sh -c "
       ip route del default 2>/dev/null || true;
       ip route add default via 10.0.0.20;
+      ip route del 10.0.0.100/32 2>/dev/null || true;
       sleep infinity
       "
 
-  # VNF CHAIN
+  # VNF CHAIN (SIMPLIFIED)
   vnf_classification:
     build: ./vnfs/classification
     container_name: vnf_classification
@@ -57,6 +61,11 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - SYS_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+      - net.ipv4.conf.all.rp_filter=0
     volumes:
       - ./logs:/logs
     environment:
@@ -74,6 +83,11 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - SYS_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+      - net.ipv4.conf.all.rp_filter=0
     volumes:
       - ./logs:/logs
     environment:
@@ -91,6 +105,11 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - SYS_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+      - net.ipv4.conf.all.rp_filter=0
     volumes:
       - ./logs:/logs
       - ./metrics:/metrics
@@ -98,40 +117,6 @@ services:
       - "9090:9090"
     environment:
       - VNF_NAME=monitoring
-      - NEXT_HOP=10.0.0.23
-    depends_on:
-      - vnf_scheduling
-
-  vnf_scheduling:
-    build: ./vnfs/scheduling
-    container_name: vnf_scheduling
-    networks:
-      qos_net:
-        ipv4_address: 10.0.0.23
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    volumes:
-      - ./logs:/logs
-    environment:
-      - VNF_NAME=scheduling
-      - NEXT_HOP=10.0.0.24
-    depends_on:
-      - vnf_access_control
-
-  vnf_access_control:
-    build: ./vnfs/access_control
-    container_name: vnf_access_control
-    networks:
-      qos_net:
-        ipv4_address: 10.0.0.24
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    volumes:
-      - ./logs:/logs
-    environment:
-      - VNF_NAME=access_control
       - NEXT_HOP=10.0.0.100
     depends_on:
       - server
@@ -146,9 +131,10 @@ services:
     cap_add:
       - NET_ADMIN
     ports:
-      - "5001:5001"
-      - "5004:5004/udp"
-      - "8080:8080"
+      - "5001:5001"    # Data
+      - "5004:5004/udp" # VoIP (UDP)
+      - "5004:5004"     # VoIP (TCP fallback)
+      - "8080:8080"     # Video
     command: sleep infinity
 
 networks:

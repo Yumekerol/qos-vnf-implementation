@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
     netcat \
     nginx \
     net-tools \
+    procps \
+    traceroute \
+    inetutils-traceroute \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /logs
