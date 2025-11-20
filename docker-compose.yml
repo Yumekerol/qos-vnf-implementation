@@ -10,14 +10,7 @@ services:
         ipv4_address: 10.0.0.10
     cap_add:
       - NET_ADMIN
-    command: >
-      sh -c "
-      ip route del default 2>/dev/null || true;
-      ip route add default via 10.0.0.20;
-      # Remover rota direta para server se existir
-      ip route del 10.0.0.100/32 2>/dev/null || true;
-      sleep infinity
-      "
+    command: sh -c "ip route del default 2>/dev/null || true && ip route add default via 10.0.0.20 && ip route del 10.0.0.100/32 2>/dev/null || true && sleep infinity"
 
   client_video:
     build: ./clients

@@ -46,3 +46,29 @@ docker-compose up -d
 docker logs vnf_classification -f
 docker logs vnf_policing -f  
 docker logs vnf_monitoring -f
+
+# Manual Testing
+## Stop any existing servers
+docker exec server pkill iperf3
+
+## Start servers
+docker exec -d server iperf3 -s -p 5001        # Data (TCP)
+docker exec -d server iperf3 -s -p 5004 -u     # VoIP (UDP)
+docker exec -d server iperf3 -s -p 8080        # Video (TCP)
+
+## Generate traaffic
+
+### VoIP Traffic (UDP, low latency):
+docker exec client_voip iperf3 -c 10.0.0.100 -u -p 5004 -b 1M -l 160 -t 30
+
+### VoIP Traffic (UDP, low latency):
+docker exec client_video iperf3 -c 10.0.0.100 -p 8080 -b 10M -t 30
+
+### Data Traffic (TCP, best effort):
+docker exec client_data iperf3 -c 10.0.0.100 -p 5001 -t 30
+
+
+## View VNF Statistics
+docker logs vnf_classification --tail 5
+docker logs vnf_policing --tail 50
+docker logs vnf_monitoring --tail 50
