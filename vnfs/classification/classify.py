@@ -37,7 +37,7 @@ stats = {
 def classify_packet(pkt):
     try:
         if not pkt.haslayer(IP):
-            logger.debug("❌ Packet without IP layer")
+            logger.debug(f"❌ Packet without IP layer: {pkt.summary()}")
             return DSCP_BE, 'unknown'
 
         ip_layer = pkt[IP]
