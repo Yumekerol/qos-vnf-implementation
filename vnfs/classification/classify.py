@@ -1,5 +1,6 @@
 from scapy.all import *
 from scapy.layers.inet import IP, TCP, UDP
+from netfilterqueue import NetfilterQueue
 import logging
 import sys
 import os
@@ -84,31 +85,24 @@ def classify_packet(pkt):
         return DSCP_BE, 'unknown'
 
 
-def mark_and_forward(pkt):
+def process_packet(packet):
     try:
         stats['total'] += 1
 
+        # Get the packet payload from netfilterqueue
+        pkt = IP(packet.get_payload())
+
         if stats['total'] <= 20 or stats['total'] % 50 == 0:
-            logger.info(f"🔍 Packet #{stats['total']} - Layers: {pkt.summary()}")
-
+            logger.info(f"🔍 Packet #{stats['total']} - {pkt.summary()}")
             if pkt.haslayer(IP):
-                ip_src = pkt[IP].src
-                ip_dst = pkt[IP].dst
-                proto = pkt[IP].proto
-                logger.info(f"   📦 IP: {ip_src} -> {ip_dst} (proto: {proto})")
-
+                logger.info(f"   📦 IP: {pkt[IP].src} -> {pkt[IP].dst} (proto: {pkt[IP].proto})")
                 if pkt.haslayer(TCP):
                     tcp = pkt[TCP]
                     logger.info(f"   📹 TCP: {tcp.sport} -> {tcp.dport}")
                 elif pkt.haslayer(UDP):
                     udp = pkt[UDP]
                     logger.info(f"   🔊 UDP: {udp.sport} -> {udp.dport}")
-            else:
-                logger.info(f"   🚫 Non-IP packet: {pkt.summary()}")
 
-        if not pkt.haslayer(IP):
-            logger.debug("❌ Skipping non-IP packet")
-            return
         dscp, traffic_type = classify_packet(pkt)
 
         if traffic_type in stats:
@@ -122,8 +116,17 @@ def mark_and_forward(pkt):
             pkt[IP].tos = dscp << 2
             if original_tos != pkt[IP].tos:
                 logger.debug(f"🏷️ DSCP marked: {original_tos} -> {pkt[IP].tos} for {traffic_type}")
+            
+            # Delete checksums so they get recalculated
+            del pkt[IP].chksum
+            if pkt.haslayer(TCP):
+                del pkt[TCP].chksum
+            elif pkt.haslayer(UDP):
+                del pkt[UDP].chksum
 
-        sendp(pkt, iface='eth0', verbose=False)
+        # Set the modified packet back to netfilterqueue
+        packet.set_payload(bytes(pkt))
+        packet.accept()
         stats['forwarded'] += 1
 
         if stats['total'] % 50 == 0:
@@ -134,18 +137,22 @@ def mark_and_forward(pkt):
 
     except Exception as e:
         stats['errors'] += 1
-        logger.error(f"💥 Forward error: {e}")
+        logger.error(f"💥 Process error: {e}")
+        packet.accept()  # Accept packet even on error to avoid blocking traffic
 
 
 def main():
     logger.info("🚀" * 20)
-    logger.info("🚀 Classification VNF Started - ULTRA DEBUG MODE")
+    logger.info("🚀 Classification VNF Started - NFQUEUE MODE")
     logger.info("🚀" * 20)
     logger.info(f"📍 Next hop: {NEXT_HOP}")
-    logger.info("👂 Listening for traffic on eth0...")
+    logger.info("👂 Listening for traffic on NFQUEUE 0...")
+
+    nfqueue = NetfilterQueue()
+    nfqueue.bind(0, process_packet)
 
     try:
-        sniff(iface='eth0', prn=mark_and_forward, store=0, promisc=True)
+        nfqueue.run()
     except KeyboardInterrupt:
         logger.info("\n" + "🛑" * 20)
         logger.info("🛑 Classification VNF Stopped")
@@ -153,6 +160,8 @@ def main():
         logger.info("🛑" * 20)
     except Exception as e:
         logger.error(f"💀 Fatal error: {e}")
+    finally:
+        nfqueue.unbind()
 
 
 if __name__ == "__main__":

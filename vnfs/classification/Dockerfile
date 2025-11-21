@@ -10,9 +10,11 @@ RUN apt-get update && apt-get install -y \
     procps \
     traceroute \
     inetutils-traceroute \
+    libnetfilter-queue-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir scapy
+RUN pip install --no-cache-dir scapy NetfilterQueue
 
 RUN mkdir -p /logs /app
 

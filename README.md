@@ -33,6 +33,15 @@ All VNFs and endpoints are deployed using Docker Compose with multiple bridge ne
 | Video | 8080 | TCP | AF41 (34) | Assured Forwarding 4 |
 | Data | 5001 | TCP | BE (0) | Best Effort |
 
+## Temporary commands (need to fix) 
+- Before running the docker-compose, convert line endings of the scripts from Windows to Unix format:
+```bash
+wsl dos2unix vnfs/classification/forward.sh
+wsl dos2unix vnfs/policing/forward.sh
+wsl dos2unix vnfs/monitoring/forward.sh
+```
+
+
 ## Quick Start
 
 ```bash
@@ -46,8 +55,10 @@ docker-compose up -d
 docker logs vnf_classification -f
 docker logs vnf_policing -f  
 docker logs vnf_monitoring -f
+```
 
 # Manual Testing
+```bash
 ## Stop any existing servers
 docker exec server pkill iperf3
 
@@ -66,9 +77,12 @@ docker exec client_video iperf3 -c 10.0.0.100 -p 8080 -b 10M -t 30
 
 ### Data Traffic (TCP, best effort):
 docker exec client_data iperf3 -c 10.0.0.100 -p 5001 -t 30
+```
 
 
 ## View VNF Statistics
+```bash
 docker logs vnf_classification --tail 5
 docker logs vnf_policing --tail 50
 docker logs vnf_monitoring --tail 50
+```
