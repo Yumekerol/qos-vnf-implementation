@@ -1,6 +1,9 @@
 FROM python:3.9-slim
 
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    libnetfilter-queue-dev \
     iproute2 \
     iputils-ping \
     tcpdump \
@@ -9,15 +12,20 @@ RUN apt-get update && apt-get install -y \
     procps \
     traceroute \
     inetutils-traceroute \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir scapy
+# Enforce iptables-legacy
+RUN update-alternatives --set iptables /usr/sbin/iptables-legacy || true
+RUN update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy || true
+
+RUN pip install --no-cache-dir scapy NetfilterQueue
 
 RUN mkdir -p /logs /app
 
 COPY police.py /app/
 COPY forward.sh /app/
-RUN chmod +x /app/forward.sh
+RUN dos2unix /app/forward.sh && chmod +x /app/forward.sh
 
 WORKDIR /app
 

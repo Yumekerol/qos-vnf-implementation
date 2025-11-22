@@ -13,18 +13,18 @@ Implementation of Quality of Service mechanisms using Virtual Network Functions 
 - **Monitoring VNF** - Real-time traffic metrics collection
 
 ## Architecture
-Client (10.0.1.10-12) -> Classification VNF (10.0.1.20) -> Policing VNF (10.0.2.21) -> Monitoring VNF (10.0.3.22) -> Server (10.0.4.100)
+Client (10.0.0.10-12) -> Classification (10.0.0.20) -> ... -> Server (10.0.0.100)
 
 
 ## Docker Environment 
 
 All VNFs and endpoints are deployed using Docker Compose with multiple bridge networks to enforce traffic through the VNF chain.
 
-### Network Configuration:
-- **network_a** (10.0.1.0/24): Clients + Classification VNF
-- **network_b** (10.0.2.0/24): Classification + Policing VNF  
-- **network_c** (10.0.3.0/24): Policing + Monitoring VNF
-- **network_d** (10.0.4.0/24): Monitoring VNF + Server
+### Network Topology:
+- Single bridge network: qos_net (10.0.0.0/24)
+- Service chaining: Traffic flows through VNFs sequentially
+- Packet interception: NetfilterQueue (NFQUEUE) captures packets at each VNF
+- Routing: Static routes force traffic through the VNF chain
 
 ### Traffic Classification Rules:
 | Traffic Type | Port | Protocol | DSCP Value | Class |
@@ -33,56 +33,54 @@ All VNFs and endpoints are deployed using Docker Compose with multiple bridge ne
 | Video | 8080 | TCP | AF41 (34) | Assured Forwarding 4 |
 | Data | 5001 | TCP | BE (0) | Best Effort |
 
-## Temporary commands (need to fix) 
-- Before running the docker-compose, convert line endings of the scripts from Windows to Unix format:
+# Quick Start
+## Clone the repository
 ```bash
-wsl dos2unix vnfs/classification/forward.sh
-wsl dos2unix vnfs/policing/forward.sh
-wsl dos2unix vnfs/monitoring/forward.sh
+git clone https://github.com/Yumekerol/qos-vnf-implementation.git 
+cd qos-vnf-implementation
 ```
 
-
-## Quick Start
-
+# Build and start the VNFs
 ```bash
-# Start VNF chain
+docker-compose build
 docker-compose up -d
-
-# Run scripts to test VNFs
-.\scripts\test_vnfs.ps1 -Duration 30
-
-# Monitor VNF logs
-docker logs vnf_classification -f
-docker logs vnf_policing -f  
-docker logs vnf_monitoring -f
+docker-compose ps
 ```
 
-# Manual Testing
+# Test the VNF chain
 ```bash
-## Stop any existing servers
-docker exec server pkill iperf3
+docker exec client_voip ping -c 5 10.0.0.100  
 
-## Start servers
-docker exec -d server iperf3 -s -p 5001        # Data (TCP)
-docker exec -d server iperf3 -s -p 5004 -u     # VoIP (UDP)
-docker exec -d server iperf3 -s -p 8080        # Video (TCP)
 
-## Generate traaffic
+# Start the server iperf3
+docker exec -d server iperf3 -s -p 5004 -u
 
-### VoIP Traffic (UDP, low latency):
-docker exec client_voip iperf3 -c 10.0.0.100 -u -p 5004 -b 1M -l 160 -t 30
+# Generate VoIP traffic (Need to fix)
+docker exec client_voip iperf3 -c 10.0.0.100 -p 5004 -u -b 200K -t 30 -l 160
 
-### VoIP Traffic (UDP, low latency):
-docker exec client_video iperf3 -c 10.0.0.100 -p 8080 -b 10M -t 30
 
-### Data Traffic (TCP, best effort):
+# Start the server
+docker exec -d server iperf3 -s -p 8080
+
+# Generate video traffic
+docker exec client_video iperf3 -c 10.0.0.100 -p 8080 -b 5M -t 30
+
+
+# Start the server
+docker exec -d server iperf3 -s -p 5001
+
+# Generate data traffic
 docker exec client_data iperf3 -c 10.0.0.100 -p 5001 -t 30
 ```
-
-
-## View VNF Statistics
+# Check VNF logs
 ```bash
-docker logs vnf_classification --tail 5
-docker logs vnf_policing --tail 50
-docker logs vnf_monitoring --tail 50
+# Classification VNF
+docker-compose logs -f vnf_classification
+
+# Policing VNF
+docker-compose logs -f vnf_policing
+
+# Monitoring VNF
+docker-compose logs -f vnf_monitoring
+
 ```

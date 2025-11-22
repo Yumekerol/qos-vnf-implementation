@@ -1,5 +1,6 @@
 from scapy.all import *
 from scapy.layers.inet import IP, TCP, UDP
+from netfilterqueue import NetfilterQueue
 import logging
 import sys
 import os
@@ -7,7 +8,7 @@ import time
 from collections import defaultdict
 
 logging.basicConfig(
-    level=logging.DEBUG,  # MUDAR para DEBUG
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('/logs/monitoring.log'),
@@ -45,9 +46,12 @@ def get_traffic_class(pkt):
     return 'unknown'
 
 
-def monitor_and_forward(pkt):
+def process_packet(packet):
     try:
         stats['total'] += 1
+        
+        # Get packet payload
+        pkt = IP(packet.get_payload())
         packet_size = len(pkt)
         stats['bytes'] += packet_size
 
@@ -56,8 +60,8 @@ def monitor_and_forward(pkt):
         stats['classes'][traffic_class]['packets'] += 1
         stats['classes'][traffic_class]['bytes'] += packet_size
 
-        # Forward packet
-        sendp(pkt, iface='eth0', verbose=False)
+        # Forward packet (Accept)
+        packet.accept()
         stats['forwarded'] += 1
 
         # Log every 500 packets
@@ -76,20 +80,23 @@ def monitor_and_forward(pkt):
             logger.info("=" * 60)
 
     except Exception as e:
-        if stats['total'] % 100 == 1:
-            logger.error(f"Error: {e}")
+        logger.error(f"Error processing packet: {e}")
+        packet.accept()  # Default to accept on error
 
 
 def main():
     logger.info("=" * 60)
-    logger.info("Monitoring VNF Started")
+    logger.info("Monitoring VNF Started - NFQUEUE MODE")
     logger.info("=" * 60)
     logger.info(f"Next hop: {NEXT_HOP}")
     logger.info("Collecting network metrics...")
     logger.info("=" * 60)
 
+    nfqueue = NetfilterQueue()
+    nfqueue.bind(0, process_packet)
+
     try:
-        sniff(iface='eth0', prn=monitor_and_forward, store=0, promisc=True)
+        nfqueue.run()
     except KeyboardInterrupt:
         elapsed = time.time() - stats['start_time']
         throughput_mbps = (stats['bytes'] * 8) / elapsed / 1_000_000
@@ -100,6 +107,10 @@ def main():
         logger.info(f"Average Throughput: {throughput_mbps:.2f} Mbps")
         logger.info(f"Final Statistics: {dict(stats['classes'])}")
         logger.info("=" * 60)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+    finally:
+        nfqueue.unbind()
 
 
 if __name__ == "__main__":

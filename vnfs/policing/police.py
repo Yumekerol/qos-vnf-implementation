@@ -1,5 +1,6 @@
 from scapy.all import *
 from scapy.layers.inet import IP, TCP, UDP
+from netfilterqueue import NetfilterQueue
 import logging
 import sys
 import os
@@ -7,7 +8,7 @@ import time
 from threading import Lock
 
 logging.basicConfig(
-    level=logging.DEBUG,  # MUDAR para DEBUG
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('/logs/policing.log'),
@@ -50,18 +51,19 @@ buckets = {
     'voip': TokenBucket(rate=125000, capacity=250000),  # 1 Mbps
     'video': TokenBucket(rate=1250000, capacity=2500000),  # 10 Mbps
     'data': TokenBucket(rate=625000, capacity=1250000),  # 5 Mbps
+    'other': TokenBucket(rate=125000, capacity=250000)  # Default 1 Mbps
 }
 
 stats = {
     'total': 0,
-    'passed': 0,
-    'dropped': 0,
     'voip_passed': 0,
     'voip_dropped': 0,
     'video_passed': 0,
     'video_dropped': 0,
     'data_passed': 0,
     'data_dropped': 0,
+    'other_passed': 0,
+    'other_dropped': 0
 }
 
 
@@ -74,50 +76,55 @@ def get_traffic_class(pkt):
                 return 'voip'
             elif dscp == 34:
                 return 'video'
-            else:
+            elif dscp == 0:
                 return 'data'
+            else:
+                return 'other'
     except:
         pass
-    return 'data'
+    return 'other'
 
 
-def police_and_forward(pkt):
+def process_packet(packet):
     try:
         stats['total'] += 1
-
-        traffic_class = get_traffic_class(pkt)
+        
+        # Get packet payload
+        pkt = IP(packet.get_payload())
         packet_size = len(pkt)
 
-        bucket = buckets.get(traffic_class, buckets['data'])
+        # Identify traffic class
+        traffic_class = get_traffic_class(pkt)
+        bucket = buckets.get(traffic_class, buckets['other'])
 
+        # Apply policing
         if bucket.consume(packet_size):
-            # Packet within rate limit - FORWARD
-            sendp(pkt, iface='eth0', verbose=False)
-            stats['passed'] += 1
+            # Pass
             stats[f'{traffic_class}_passed'] += 1
+            packet.accept()
         else:
-            # Packet exceeds rate limit - DROP
-            stats['dropped'] += 1
+            # Drop
             stats[f'{traffic_class}_dropped'] += 1
+            packet.drop()
+            if stats['total'] % 100 == 0:
+                logger.warning(f"Dropped {traffic_class} packet (Rate limit exceeded)")
 
-        # Log every 500 packets
-        if stats['total'] % 500 == 0:
-            drop_rate = (stats['dropped'] / stats['total']) * 100
+        # Log statistics occasionally
+        if stats['total'] % 100 == 0:
             logger.info(
                 f"Stats: Total={stats['total']} | "
-                f"Passed={stats['passed']} | Dropped={stats['dropped']} ({drop_rate:.1f}%) | "
                 f"VoIP: {stats['voip_passed']}/{stats['voip_dropped']} | "
                 f"Video: {stats['video_passed']}/{stats['video_dropped']} | "
                 f"Data: {stats['data_passed']}/{stats['data_dropped']}")
 
     except Exception as e:
-        if stats['total'] % 100 == 1:  # Log only occasionally
-            logger.error(f"Error: {e}")
+        logger.error(f"Error processing packet: {e}")
+        packet.accept()  # Default to accept on error
 
 
 def main():
     logger.info("=" * 60)
-    logger.info("Policing VNF Started")
+    logger.info("Policing VNF Started - NFQUEUE MODE")
     logger.info("=" * 60)
     logger.info(f"Next hop: {NEXT_HOP}")
     logger.info("Rate Limits:")
@@ -126,13 +133,20 @@ def main():
     logger.info("  - Data:  5 Mbps (625 KB/s)")
     logger.info("=" * 60)
 
+    nfqueue = NetfilterQueue()
+    nfqueue.bind(0, process_packet)
+
     try:
-        sniff(iface='eth0', prn=police_and_forward, store=0, promisc=True)
+        nfqueue.run()
     except KeyboardInterrupt:
         logger.info("\n" + "=" * 60)
         logger.info("Policing VNF Stopped")
         logger.info(f"Final Statistics: {stats}")
         logger.info("=" * 60)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+    finally:
+        nfqueue.unbind()
 
 
 if __name__ == "__main__":

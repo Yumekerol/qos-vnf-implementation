@@ -113,21 +113,30 @@ def process_packet(packet):
         # Mark DSCP in IP header
         if pkt.haslayer(IP):
             original_tos = pkt[IP].tos
-            pkt[IP].tos = dscp << 2
-            if original_tos != pkt[IP].tos:
-                logger.debug(f"🏷️ DSCP marked: {original_tos} -> {pkt[IP].tos} for {traffic_type}")
+            new_tos = dscp << 2
             
-            # Delete checksums so they get recalculated
-            del pkt[IP].chksum
-            if pkt.haslayer(TCP):
-                del pkt[TCP].chksum
-            elif pkt.haslayer(UDP):
-                del pkt[UDP].chksum
-
-        # Set the modified packet back to netfilterqueue
-        packet.set_payload(bytes(pkt))
-        packet.accept()
-        stats['forwarded'] += 1
+            if original_tos != new_tos:
+                pkt[IP].tos = new_tos
+                logger.debug(f"🏷️ DSCP marked: {original_tos} -> {new_tos} for {traffic_type}")
+                
+                # Delete checksums so they get recalculated
+                del pkt[IP].chksum
+                if pkt.haslayer(TCP):
+                    del pkt[TCP].chksum
+                elif pkt.haslayer(UDP):
+                    del pkt[UDP].chksum
+                
+                # Set the modified packet back to netfilterqueue
+                packet.set_payload(bytes(pkt))
+                packet.accept()
+                stats['forwarded'] += 1
+            else:
+                # No change needed, just accept original packet
+                packet.accept()
+                stats['forwarded'] += 1
+        else:
+            packet.accept()
+            stats['forwarded'] += 1
 
         if stats['total'] % 50 == 0:
             logger.info(
