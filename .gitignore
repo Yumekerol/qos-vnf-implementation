@@ -15,7 +15,10 @@ coverage
 *.local
 
 metrics/
-test_results_
+test_results_*/
+test_results_*.zip
+
+
 /cypress/videos/
 /cypress/screenshots/
 
