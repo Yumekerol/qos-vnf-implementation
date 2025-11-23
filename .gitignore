@@ -15,7 +15,12 @@ coverage
 *.local
 
 metrics/
-test_results_*/
+test_results*/
+
+comparison_*/
+mixed_*/
+quick_*/
+
 test_results_*.zip
 
 
