@@ -95,7 +95,7 @@ def run_test(scenario_name, results_dir, duration=30):
     time.sleep(1)
 
     print("Starting iperf3 servers...")
-    run_command("docker exec -d server iperf3 -s -p 5004 -u")  # VoIP (UDP)
+    run_command("docker exec -d server iperf3 -s -p 5004")  # VoIP (UDP)
     run_command("docker exec -d server iperf3 -s -p 8080")  # Video (TCP)
     run_command("docker exec -d server iperf3 -s -p 5001")  # Data (TCP)
     time.sleep(2)

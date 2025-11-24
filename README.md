@@ -51,13 +51,12 @@ docker-compose ps
 ```bash
 docker exec client_voip ping -c 5 10.0.0.100  
 
-
+docker exec server pkill iperf3
 # Start the server iperf3
-docker exec -d server iperf3 -s -p 5004 -u
+docker exec -d server iperf3 -s -p 5004
 
 # Generate VoIP traffic (Need to fix)
 docker exec client_voip iperf3 -c 10.0.0.100 -p 5004 -u -b 200K -t 30 -l 160
-
 
 # Start the server
 docker exec -d server iperf3 -s -p 8080
@@ -83,4 +82,9 @@ docker-compose logs -f vnf_policing
 # Monitoring VNF
 docker-compose logs -f vnf_monitoring
 
+```
+
+```bash
+python ./scripts/compare_comprehensive_scenarios.py
+python .\scripts\analyse_results.py .\test_results\comprehensive_******_*****
 ```

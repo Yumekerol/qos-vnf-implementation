@@ -38,7 +38,7 @@ def main():
     run_command("docker exec server pkill iperf3")
     time.sleep(1)
     print("🚀 Starting iperf3 servers...")
-    run_command("docker exec -d server iperf3 -s -p 5004 -u")
+    run_command("docker exec -d server iperf3 -s -p 5004")
     run_command("docker exec -d server iperf3 -s -p 8080")
     run_command("docker exec -d server iperf3 -s -p 5001")
     time.sleep(2)

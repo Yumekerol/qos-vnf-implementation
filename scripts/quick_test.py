@@ -36,7 +36,7 @@ def main():
     time.sleep(1)
 
     print("🚀 Starting iperf3 servers...")
-    run_command("docker exec -d server iperf3 -s -p 5004 -u")  # VoIP
+    run_command("docker exec -d server iperf3 -s -p 5004")  # VoIP
     run_command("docker exec -d server iperf3 -s -p 8080")   # Video
     run_command("docker exec -d server iperf3 -s -p 5001")   # Data
     time.sleep(2)
