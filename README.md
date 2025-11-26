@@ -55,7 +55,7 @@ docker exec server pkill iperf3
 # Start the server iperf3
 docker exec -d server iperf3 -s -p 5004
 
-# Generate VoIP traffic (Need to fix)
+# Generate VoIP traffic 
 docker exec client_voip iperf3 -c 10.0.0.100 -p 5004 -u -b 200K -t 30 -l 160
 
 # Start the server
