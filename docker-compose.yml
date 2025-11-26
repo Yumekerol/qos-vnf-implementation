@@ -77,7 +77,9 @@ services:
       - net.ipv4.conf.default.send_redirects=0
       - net.ipv4.conf.eth0.send_redirects=0
     volumes:
+
       - ./logs:/logs
+      - ./vnfs/policing/police.py:/app/police.py
     environment:
       - VNF_NAME=policing
       - NEXT_HOP=10.0.0.22
@@ -124,10 +126,10 @@ services:
     cap_add:
       - NET_ADMIN
     ports:
-      - "5001:5001"    # Data
+      - "5001:5001" # Data
       - "5004:5004/udp" # VoIP (UDP)
-      - "5004:5004"     # VoIP (TCP fallback)
-      - "8080:8080"     # Video
+      - "5004:5004" # VoIP (TCP fallback)
+      - "8080:8080" # Video
     command: sleep infinity
 
 networks:

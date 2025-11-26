@@ -113,7 +113,6 @@ def clear_vnf_logs():
     vnfs = ["vnf_classification", "vnf_policing", "vnf_monitoring"]
 
     for vnf in vnfs:
-        # keep file but empty content
         run_command(f"docker exec {vnf} sh -c '> /logs/classification.log' 2>/dev/null")
         run_command(f"docker exec {vnf} sh -c '> /logs/policing.log' 2>/dev/null")
         run_command(f"docker exec {vnf} sh -c '> /logs/monitoring.log' 2>/dev/null")
@@ -148,6 +147,33 @@ def run_test_scenario(config_name, results_dir, duration=30):
     else:
         print("⚠ Warning: Servers not running properly")
 
+    print(f"Starting mixed traffic ({duration} seconds)...")
+
+    run_command("docker exec client_voip rm -f /tmp/voip.json")
+    run_command("docker exec client_video rm -f /tmp/video.json")
+    run_command("docker exec client_data rm -f /tmp/data.json")
+
+    run_command(
+        f'docker exec -d client_voip sh -c "iperf3 -c 10.0.0.100 -p 5004 -u -b 200K -t {duration} -l 160 -J > /tmp/voip.json 2>&1"')
+    run_command(
+        f'docker exec -d client_video sh -c "iperf3 -c 10.0.0.100 -p 8080 -b 5M -t {duration} -J > /tmp/video.json 2>&1"')
+    run_command(
+        f'docker exec -d client_data sh -c "iperf3 -c 10.0.0.100 -p 5001 -t {duration} -J > /tmp/data.json 2>&1"')
+
+    for i in range(1, duration + 1):
+        print(f"\r  Progress: {i:2d}/{duration} seconds", end='', flush=True)
+        time.sleep(1)
+    print()
+
+    time.sleep(3)
+
+    run_command(f'docker cp client_voip:/tmp/voip.json "{scenario_dir.resolve()}/voip.json"')
+    run_command(f'docker cp client_video:/tmp/video.json "{scenario_dir.resolve()}/video.json"')
+    run_command(f'docker cp client_data:/tmp/data.json "{scenario_dir.resolve()}/data.json"')
+    run_command(f'docker cp vnf_classification:/logs/classification.log "{scenario_dir.resolve()}/classification.log"')
+    run_command(f'docker cp vnf_policing:/logs/policing.log "{scenario_dir.resolve()}/policing.log"')
+    run_command(f'docker cp vnf_monitoring:/logs/monitoring.log "{scenario_dir.resolve()}/monitoring.log"')
+    print(f"  ✓ Results saved to {scenario_dir.name}")
 
 def parse_json_metric(filepath, metric_type):
     if not filepath.exists():
