@@ -100,11 +100,13 @@ def main():
     except KeyboardInterrupt:
         elapsed = time.time() - stats['start_time']
         throughput_mbps = (stats['bytes'] * 8) / elapsed / 1_000_000
+        interval_throughput = (interval_bytes * 8) / elapsed / 1_000_000
 
         logger.info("\n" + "=" * 60)
         logger.info("Monitoring VNF Stopped")
         logger.info(f"Session Duration: {elapsed:.1f} seconds")
         logger.info(f"Average Throughput: {throughput_mbps:.2f} Mbps")
+        logger.info(f"Interval Throughput: {interval_throughput:.2f} Mbps")
         logger.info(f"Final Statistics: {dict(stats['classes'])}")
         logger.info("=" * 60)
     except Exception as e:
