@@ -103,11 +103,11 @@ def run_test(scenario_name, results_dir, duration=30):
     print(f"Starting mixed traffic ({duration} seconds)...")
 
     run_command(
-        f'docker exec -d client_voip sh -c "iperf3 -c 10.0.0.100 -p 5004 -u -b 200K -t {duration} -l 160 -J > /tmp/voip.json 2>&1"')
+        f'docker exec -d client_voip sh -c "iperf3 -c 10.0.0.100 -p 5004 -u -b 150K -t {duration} -l 160 -J > /tmp/voip.json 2>&1"')
     run_command(
         f'docker exec -d client_video sh -c "iperf3 -c 10.0.0.100 -p 8080 -b 5M -t {duration} -J > /tmp/video.json 2>&1"')
     run_command(
-        f'docker exec -d client_data sh -c "iperf3 -c 10.0.0.100 -p 5001 -t {duration} -J > /tmp/data.json 2>&1"')
+        f'docker exec -d client_data sh -c "iperf3 -c 10.0.0.100 -p 5001 -b 20M -t {duration} -J > /tmp/data.json 2>&1"')
 
     for i in range(1, duration + 1):
         print(f"\r  Progress: {i:2d}/{duration} seconds", end='', flush=True)
@@ -191,7 +191,7 @@ def analyze_all_results(results_dir, scenarios):
         }
 
     print("\n" + "=" * 60)
-    print("VoIP Performance (UDP 200Kbps target)")
+    print("VoIP Performance (UDP 150Kbps target)")
     print("=" * 60)
     print(f"{'Scenario':<25} {'Throughput':<15} {'Jitter':<12} {'Loss':<10}")
     print("-" * 62)

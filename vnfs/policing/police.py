@@ -48,9 +48,9 @@ class TokenBucket:
 
 # Traffic buckets with rate limits
 buckets = {
-    'voip': TokenBucket(rate=125000, capacity=250000),  # 1 Mbps
-    'video': TokenBucket(rate=1250000, capacity=2500000),  # 10 Mbps
-    'data': TokenBucket(rate=625000, capacity=1250000),  # 5 Mbps
+    'voip': TokenBucket(rate=187500, capacity=375000),  # 1.5 Mbps (VoIP protected)
+    'video': TokenBucket(rate=750000, capacity=1500000),  # 6 Mbps (Video medium priority)
+    'data': TokenBucket(rate=250000, capacity=500000),  # 2 Mbps (Data best-effort, lowest)
     'other': TokenBucket(rate=125000, capacity=250000)  # Default 1 Mbps
 }
 
@@ -128,9 +128,9 @@ def main():
     logger.info("=" * 60)
     logger.info(f"Next hop: {NEXT_HOP}")
     logger.info("Rate Limits:")
-    logger.info("  - VoIP:  1 Mbps (125 KB/s)")
-    logger.info("  - Video: 10 Mbps (1250 KB/s)")
-    logger.info("  - Data:  5 Mbps (625 KB/s)")
+    logger.info("  - VoIP:  1.5 Mbps (187.5 KB/s) - PROTECTED")
+    logger.info("  - Video: 6 Mbps (750 KB/s) - MEDIUM PRIORITY")
+    logger.info("  - Data:  2 Mbps (250 KB/s) - BEST EFFORT")
     logger.info("=" * 60)
 
     nfqueue = NetfilterQueue()
