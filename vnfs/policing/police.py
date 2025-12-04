@@ -48,9 +48,9 @@ class TokenBucket:
 
 # Traffic buckets with rate limits
 buckets = {
-    'voip': TokenBucket(rate=187500, capacity=375000),  # 1.5 Mbps (VoIP protected)
-    'video': TokenBucket(rate=750000, capacity=1500000),  # 6 Mbps (Video medium priority)
-    'data': TokenBucket(rate=250000, capacity=500000),  # 2 Mbps (Data best-effort, lowest)
+    'voip': TokenBucket(rate=600000, capacity=1000000),  # 2 Mbps
+    'video': TokenBucket(rate=750000, capacity=1500000),  # 6 Mbps
+    'data': TokenBucket(rate=187500, capacity=375000),  # 1.5 Mbps
     'other': TokenBucket(rate=125000, capacity=250000)  # Default 1 Mbps
 }
 
