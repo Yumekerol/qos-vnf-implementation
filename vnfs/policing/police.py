@@ -21,8 +21,6 @@ NEXT_HOP = os.environ.get('NEXT_HOP', '10.0.0.22')
 
 
 class TokenBucket:
-    """Token bucket algorithm for rate limiting"""
-
     def __init__(self, rate, capacity):
         self.rate = rate  # bytes per second
         self.capacity = capacity  # maximum burst size
@@ -35,23 +33,31 @@ class TokenBucket:
             now = time.time()
             elapsed = now - self.last_update
 
-            # Add tokens based on elapsed time
             self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
             self.last_update = now
 
-            # Check if we have enough tokens
             if tokens_needed <= self.tokens:
                 self.tokens -= tokens_needed
                 return True
             return False
 
-
-# Traffic buckets with rate limits
 buckets = {
-    'voip': TokenBucket(rate=600000, capacity=1000000),  # 2 Mbps
-    'video': TokenBucket(rate=750000, capacity=1500000),  # 6 Mbps
-    'data': TokenBucket(rate=187500, capacity=375000),  # 1.5 Mbps
-    'other': TokenBucket(rate=125000, capacity=250000)  # Default 1 Mbps
+    'voip': TokenBucket(
+        rate=25000,      # 0.2 Mbps = 25 KB/s (margem de 33% sobre 150Kbps)
+        capacity=50000   # Burst de 50 KB (permite jitter)
+    ),
+    'video': TokenBucket(
+        rate=500000,     # 4 Mbps = 500 KB/s (margem sobre 3Mbps)
+        capacity=1000000
+    ),
+    'data': TokenBucket(
+        rate=250000,     # 2 Mbps = 250 KB/s (best-effort)
+        capacity=500000  # Burst de 500 KB
+    ),
+    'other': TokenBucket(
+        rate=125000,     # 1 Mbps = 125 KB/s
+        capacity=250000
+    )
 }
 
 stats = {
@@ -72,11 +78,11 @@ def get_traffic_class(pkt):
     try:
         if pkt.haslayer(IP):
             dscp = pkt[IP].tos >> 2
-            if dscp == 46:
+            if dscp == 46:  # EF
                 return 'voip'
-            elif dscp == 34:
+            elif dscp == 34:  # AF41
                 return 'video'
-            elif dscp == 0:
+            elif dscp == 0:  # BE
                 return 'data'
             else:
                 return 'other'
@@ -88,7 +94,7 @@ def get_traffic_class(pkt):
 def process_packet(packet):
     try:
         stats['total'] += 1
-        
+
         # Get packet payload
         pkt = IP(packet.get_payload())
         packet_size = len(pkt)
@@ -97,25 +103,37 @@ def process_packet(packet):
         traffic_class = get_traffic_class(pkt)
         bucket = buckets.get(traffic_class, buckets['other'])
 
-        # Apply policing
-        if bucket.consume(packet_size):
-            # Pass
-            stats[f'{traffic_class}_passed'] += 1
-            packet.accept()
+        # Apply policing with priority for VoIP
+        if traffic_class == 'voip':
+            # VoIP SEMPRE tem prioridade - nunca dropar se estiver na taxa
+            if bucket.consume(packet_size):
+                stats['voip_passed'] += 1
+                packet.accept()
+            else:
+                # Log mais agressivo para VoIP drops (NÃO DEVERIA ACONTECER!)
+                stats['voip_dropped'] += 1
+                logger.error(f"🔴 CRITICAL: VoIP packet DROPPED! Size={packet_size} bytes")
+                packet.drop()
         else:
-            # Drop
-            stats[f'{traffic_class}_dropped'] += 1
-            packet.drop()
-            if stats['total'] % 100 == 0:
-                logger.warning(f"Dropped {traffic_class} packet (Rate limit exceeded)")
+            # Video e Data: policing normal
+            if bucket.consume(packet_size):
+                stats[f'{traffic_class}_passed'] += 1
+                packet.accept()
+            else:
+                stats[f'{traffic_class}_dropped'] += 1
+                packet.drop()
+                if stats['total'] % 500 == 0:  # Log menos frequente
+                    logger.warning(f"Dropped {traffic_class} packet (Rate limit exceeded)")
 
         # Log statistics occasionally
-        if stats['total'] % 100 == 0:
+        if stats['total'] % 1000 == 0:  # A cada 1000 pacotes
             logger.info(
                 f"Stats: Total={stats['total']} | "
-                f"VoIP: {stats['voip_passed']}/{stats['voip_dropped']} | "
+                f"VoIP: {stats['voip_passed']}/{stats['voip_dropped']} "
+                f"({100*stats['voip_passed']/(stats['voip_passed']+stats['voip_dropped']+0.001):.1f}% pass) | "
                 f"Video: {stats['video_passed']}/{stats['video_dropped']} | "
-                f"Data: {stats['data_passed']}/{stats['data_dropped']}")
+                f"Data: {stats['data_passed']}/{stats['data_dropped']}"
+            )
 
     except Exception as e:
         logger.error(f"Error processing packet: {e}")
@@ -124,24 +142,29 @@ def process_packet(packet):
 
 def main():
     logger.info("=" * 60)
-    logger.info("Policing VNF Started - NFQUEUE MODE")
+    logger.info("Policing VNF Started - OPTIMIZED CONFIG")
     logger.info("=" * 60)
     logger.info(f"Next hop: {NEXT_HOP}")
-    logger.info("Rate Limits:")
-    logger.info("  - VoIP:  1.5 Mbps (187.5 KB/s) - PROTECTED")
-    logger.info("  - Video: 6 Mbps (750 KB/s) - MEDIUM PRIORITY")
+    logger.info("Rate Limits (Optimized for Real Traffic):")
+    logger.info("  - VoIP:  0.2 Mbps (25 KB/s) - STRICT PROTECTION")
+    logger.info("  - Video: 4 Mbps (500 KB/s) - MEDIUM PRIORITY")
     logger.info("  - Data:  2 Mbps (250 KB/s) - BEST EFFORT")
+    logger.info("=" * 60)
+    logger.warning("⚠️  VoIP drops should be ZERO in all scenarios!")
     logger.info("=" * 60)
 
     nfqueue = NetfilterQueue()
-    nfqueue.bind(0, process_packet)
+    nfqueue.bind(0, process_packet, max_len=10000)
 
     try:
         nfqueue.run()
     except KeyboardInterrupt:
         logger.info("\n" + "=" * 60)
         logger.info("Policing VNF Stopped")
-        logger.info(f"Final Statistics: {stats}")
+        logger.info(f"Final Statistics:")
+        logger.info(f"  VoIP:  {stats['voip_passed']} passed / {stats['voip_dropped']} dropped")
+        logger.info(f"  Video: {stats['video_passed']} passed / {stats['video_dropped']} dropped")
+        logger.info(f"  Data:  {stats['data_passed']} passed / {stats['data_dropped']} dropped")
         logger.info("=" * 60)
     except Exception as e:
         logger.error(f"Fatal error: {e}")

@@ -104,7 +104,7 @@ def rebuild_policing_vnf():
 
 
 def clear_vnf_logs():
-    print("  🧹 Clearing VNF logs...")
+    print("# Clearing VNF logs...")
     vnfs = ["vnf_classification", "vnf_policing", "vnf_monitoring"]
 
     for vnf in vnfs:
@@ -121,7 +121,7 @@ def run_test_scenario(config_name, results_dir, duration=30):
     scenario_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n{'=' * 60}")
-    print(f"🧪 Testing: {config_name}")
+    print(f"# Testing: {config_name}")
     print(f"{'=' * 60}")
 
     clear_vnf_logs()
@@ -132,7 +132,7 @@ def run_test_scenario(config_name, results_dir, duration=30):
         run_command(f"docker exec {container} pkill -9 iperf3 2>/dev/null")
     time.sleep(3)
 
-    print("📡 Starting iperf3 servers...")
+    print(":D Starting iperf3 servers...")
     run_command("docker exec -d server iperf3 -s -p 5004 -1")  # VoIP (UDP)
     run_command("docker exec -d server iperf3 -s -p 8080 -1")  # Video (TCP)
     run_command("docker exec -d server iperf3 -s -p 5001 -1")  # Data (TCP)
@@ -142,9 +142,9 @@ def run_test_scenario(config_name, results_dir, duration=30):
     if "5004" in out and "8080" in out and "5001" in out:
         print("✓ All servers listening")
     else:
-        print("⚠️  Warning: Some servers may not be listening")
+        print("!!! Warning: Some servers may not be listening")
 
-    print(f"🚀 Starting mixed traffic ({duration} seconds) in PRIORITY ORDER...")
+    print(f" Starting mixed traffic ({duration} seconds) in PRIORITY ORDER...")
 
     # Clean old results
     for container in ["client_voip", "client_video", "client_data"]:
@@ -154,42 +154,42 @@ def run_test_scenario(config_name, results_dir, duration=30):
     # START IN PRIORITY ORDER: VoIP → Video → Data
     # ============================================================
 
-    print("  1️⃣  VoIP (UDP 150Kbps) starting...")
+    print(" VoIP (UDP 150Kbps) starting...")
     run_command(
         f'docker exec -d client_voip sh -c "iperf3 -c 10.0.0.100 -p 5004 -u -b 150K -t {duration} -l 160 -J > /tmp/voip.json 2>&1"')
-    print("      ⏱️  Waiting 5 seconds for VoIP flow...")
+    print(" Waiting 5 seconds for VoIP flow...")
     time.sleep(5)
-    print("      ✅ VoIP flow stable")
+    print(" VoIP flow stable")
 
-    print("  2️⃣  Video (TCP 3Mbps) starting...")
+    print(" Video (TCP 3Mbps) starting...")
     run_command(
         f'docker exec -d client_video sh -c "iperf3 -c 10.0.0.100 -p 8080 -b 3M -t {duration} -J > /tmp/video.json 2>&1"')
-    print("      ⏱️  Waiting 3 seconds for Video flow...")
+    print(" Waiting 3 seconds for Video flow...")
     time.sleep(3)
-    print("      ✅ Video flow active")
+    print(" Video flow active")
 
-    print("  3️⃣  Data (TCP 20Mbps) starting...")
+    print(" Data (TCP 20Mbps) starting...")
     run_command(
         f'docker exec -d client_data sh -c "iperf3 -c 10.0.0.100 -p 5001 -b 20M -t {duration} -J > /tmp/data.json 2>&1"')
-    print("      ✅ Data started (competing for bandwidth)")
+    print(" Data started (competing for bandwidth)")
 
-    print("\n⏳ All flows active - test running...")
+    print("\n All flows active - test running...")
     for i in range(1, duration + 1):
-        print(f"\r  ⏱️  Progress: {i:2d}/{duration} seconds", end='', flush=True)
+        print(f"\r Progress: {i:2d}/{duration} seconds", end='', flush=True)
         time.sleep(1)
     print()
 
-    print("\n⌛ Waiting for tests to complete...")
+    print("\n Waiting for tests to complete...")
     time.sleep(5)
 
-    print("📥 Collecting results...")
+    print(" Collecting results...")
     run_command(f'docker cp client_voip:/tmp/voip.json "{scenario_dir.resolve()}/voip.json"')
     run_command(f'docker cp client_video:/tmp/video.json "{scenario_dir.resolve()}/video.json"')
     run_command(f'docker cp client_data:/tmp/data.json "{scenario_dir.resolve()}/data.json"')
     run_command(f'docker cp vnf_classification:/logs/classification.log "{scenario_dir.resolve()}/classification.log"')
     run_command(f'docker cp vnf_policing:/logs/policing.log "{scenario_dir.resolve()}/policing.log"')
     run_command(f'docker cp vnf_monitoring:/logs/monitoring.log "{scenario_dir.resolve()}/monitoring.log"')
-    print(f"  ✅ Results saved to {scenario_dir.name}")
+    print(f"Results saved to {scenario_dir.name}")
 
 
 def parse_json_metric(filepath, metric_type):
@@ -240,19 +240,19 @@ def analyze_config_results(results_dir, configs):
         }
 
     print("\n" + "=" * 60)
-    print("📞 VoIP Performance")
+    print(" VoIP Performance")
     print("=" * 60)
     print(f"{'Config':<30} {'Throughput':<15} {'Jitter':<12} {'Loss':<10}")
     print("-" * 67)
 
     for config_name in results:
         m = results[config_name]
-        loss_status = "✅" if m['voip_loss'] < 1.0 else "⚠️" if m['voip_loss'] < 3.0 else "❌"
+        loss_status = "✅" if m['voip_loss'] < 1.0 else "!!!" if m['voip_loss'] < 3.0 else "XXXXX"
         print(
             f"{config_name:<30} {m['voip_tp']:.3f} Mbps{'':<5} {m['voip_jitter']:.2f} ms{'':<3} {m['voip_loss']:.2f}% {loss_status}")
 
     print("\n" + "=" * 60)
-    print("📹 Video Performance")
+    print(" Video Performance")
     print("=" * 60)
     print(f"{'Config':<30} {'Throughput':<15} {'Retransmits':<12}")
     print("-" * 57)
@@ -262,7 +262,7 @@ def analyze_config_results(results_dir, configs):
         print(f"{config_name:<30} {m['video_tp']:.2f} Mbps{'':<6} {m['video_retrans']}")
 
     print("\n" + "=" * 60)
-    print("💾 Data Performance")
+    print(" Data Performance")
     print("=" * 60)
     print(f"{'Config':<30} {'Throughput':<15} {'Retransmits':<12}")
     print("-" * 57)
@@ -272,12 +272,12 @@ def analyze_config_results(results_dir, configs):
         print(f"{config_name:<30} {m['data_tp']:.2f} Mbps{'':<6} {m['data_retrans']}")
 
     print("\n" + "=" * 60)
-    print("⚖️  TRADE-OFF ANALYSIS")
+    print(" TRADE-OFF ANALYSIS")
     print("=" * 60)
 
     baseline = results.get('config_a_current_optimal')
     if baseline:
-        print(f"\n📍 Baseline (Current Optimal Config):")
+        print(f"\n Baseline (Current Optimal Config):")
         print(f"  VoIP:  {baseline['voip_tp']:.3f} Mbps | Loss: {baseline['voip_loss']:.2f}%")
         print(f"  Video: {baseline['video_tp']:.2f} Mbps")
         print(f"  Data:  {baseline['data_tp']:.2f} Mbps")
@@ -294,26 +294,26 @@ def analyze_config_results(results_dir, configs):
             data_change = ((m['data_tp'] - baseline['data_tp']) / baseline['data_tp'] * 100) if baseline[
                                                                                                     'data_tp'] > 0 else 0
 
-            print(f"\n📌 {config_name}:")
+            print(f"\n {config_name}:")
             print(f"  VoIP:  {m['voip_tp']:.3f} Mbps | Loss: {m['voip_loss']:.2f}% ({voip_loss_change:+.2f}%)")
             print(f"  Video: {m['video_tp']:.2f} Mbps ({video_change:+.1f}%)")
             print(f"  Data:  {m['data_tp']:.2f} Mbps ({data_change:+.1f}%)")
 
-            print(f"\n  💡 Trade-offs:")
+            print(f"\n Trade-offs:")
             if voip_loss_change > 1.0:
-                print(f"    ❌ VoIP quality degraded (loss +{voip_loss_change:.2f}%)")
+                print(f"    VoIP quality degraded (loss +{voip_loss_change:.2f}%)")
             elif voip_loss_change < -0.5:
-                print(f"    ✅ VoIP quality improved (loss {voip_loss_change:.2f}%)")
+                print(f"    VoIP quality improved (loss {voip_loss_change:.2f}%)")
 
             if video_change > 10:
-                print(f"    📈 Video throughput significantly improved (+{video_change:.1f}%)")
+                print(f"    Video throughput significantly improved (+{video_change:.1f}%)")
             elif video_change < -10:
-                print(f"    📉 Video throughput significantly reduced ({video_change:.1f}%)")
+                print(f"    Video throughput significantly reduced ({video_change:.1f}%)")
 
             if data_change > 20:
-                print(f"    📈 Data gets much more bandwidth (+{data_change:.1f}%)")
+                print(f"    Data gets much more bandwidth (+{data_change:.1f}%)")
             elif data_change < -20:
-                print(f"    📉 Data severely restricted ({data_change:.1f}%)")
+                print(f"    Data severely restricted ({data_change:.1f}%)")
 
     # Save summary
     summary_path = results_dir / "optimization_summary.md"
@@ -398,7 +398,7 @@ def main():
 
     print(f"\nResults directory: {results_dir}")
 
-    input("\n▶️  Press Enter to start optimization testing...")
+    input("\nPress Enter to start optimization testing...")
 
     try:
         for i, (config_name, voip_rate, video_rate, data_rate) in enumerate(configs, 1):
@@ -407,41 +407,41 @@ def main():
             print(f"{'#' * 60}")
 
             if not modify_police_config(config_name, voip_rate, video_rate, data_rate):
-                print("❌ Failed to modify config, skipping...")
+                print("Failed to modify config, skipping...")
                 continue
 
             if not rebuild_policing_vnf():
-                print("❌ Failed to rebuild VNF, skipping...")
+                print("Failed to rebuild VNF, skipping...")
                 continue
 
             run_test_scenario(config_name, results_dir, duration=30)
 
             if i < len(configs):
-                print(f"\n⏸️  Waiting 5s before next config...")
+                print(f"\nWaiting 5s before next config...")
                 time.sleep(5)
 
-        print("\n\n🔄 Restoring original configuration...")
+        print("\n\n Restoring original configuration...")
         restore_police_py()
         rebuild_policing_vnf()
 
         analyze_config_results(results_dir, configs)
 
         print("\n" + "=" * 60)
-        print("✅ OPTIMIZATION TEST COMPLETE!")
+        print("OPTIMIZATION TEST COMPLETE!")
         print("=" * 60)
-        print(f"\n📂 Results: {results_dir}")
-        print("\n📋 Next steps:")
+        print(f"\nResults: {results_dir}")
+        print("\nNext steps:")
         print("  1. Review optimization_summary.md")
         print("  2. Choose best configuration for final report")
         print("  3. Document trade-offs in Phase 3")
 
     except KeyboardInterrupt:
-        print("\n\n⚠️  Testing interrupted!")
-        print("🔄 Restoring original configuration...")
+        print("\n\nTesting interrupted!")
+        print("Restoring original configuration...")
         restore_police_py()
         rebuild_policing_vnf()
 
-    input("\n▶️  Press Enter to exit...")
+    input("\nPress Enter to exit...")
 
 
 if __name__ == "__main__":

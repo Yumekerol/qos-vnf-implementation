@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('/logs/monitoring.log'),
@@ -64,8 +64,8 @@ def process_packet(packet):
         packet.accept()
         stats['forwarded'] += 1
 
-        # Log every 500 packets
-        if stats['total'] % 500 == 0:
+        # Log every 1000 packets
+        if stats['total'] % 1000 == 0:
             elapsed = time.time() - stats['start_time']
             throughput_mbps = (stats['bytes'] * 8) / elapsed / 1_000_000
 
@@ -93,14 +93,13 @@ def main():
     logger.info("=" * 60)
 
     nfqueue = NetfilterQueue()
-    nfqueue.bind(0, process_packet)
+    nfqueue.bind(0, process_packet, max_len=10000)
 
     try:
         nfqueue.run()
     except KeyboardInterrupt:
         elapsed = time.time() - stats['start_time']
         throughput_mbps = (stats['bytes'] * 8) / elapsed / 1_000_000
-        interval_throughput = (interval_bytes * 8) / elapsed / 1_000_000
 
         logger.info("\n" + "=" * 60)
         logger.info("Monitoring VNF Stopped")

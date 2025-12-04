@@ -7,16 +7,16 @@ import sys
 
 def load_iperf_json(filepath):
     if not filepath.exists():
-        print(f"⚠️  Warning: File not found: {filepath}")
+        print(f"Warning: File not found: {filepath}")
         return None
 
     try:
         with open(filepath, 'r') as f:
             data = json.load(f)
-            print(f"✓ Loaded: {filepath.name}")
+            print(f"    ✓ Loaded: {filepath.name}")
             return data
     except Exception as e:
-        print(f"❌ Error loading {filepath}: {e}")
+        print(f"Error loading {filepath}: {e}")
         return None
 
 
@@ -49,7 +49,7 @@ def extract_tcp_metrics(data):
 
 
 def analyze_scenario(scenario_path):
-    print(f"\n📂 Analyzing: {scenario_path.name}")
+    print(f"\nAnalyzing: {scenario_path.name}")
     voip_data = load_iperf_json(scenario_path / "voip.json")
     video_data = load_iperf_json(scenario_path / "video.json")
     data_data = load_iperf_json(scenario_path / "data.json")
