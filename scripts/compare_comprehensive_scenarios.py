@@ -72,7 +72,6 @@ def apply_network_condition(condition):
     print("Clearing previous conditions...")
     for vnf in vnfs:
         run_command(f"docker exec {vnf} tc qdisc del dev eth0 root 2>/dev/null")
-
     time.sleep(1)
 
     if condition == "baseline":

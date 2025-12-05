@@ -49,11 +49,9 @@ def classify_packet(pkt):
             if udp.dport == 5004 or udp.sport == 5004:
                 logger.info(" *** VOIP TRAFFIC CLASSIFIED ***")
                 return DSCP_EF, 'voip'
-
         # Check TCP
         if pkt.haslayer(TCP):
             tcp = pkt[TCP]
-            # logger.info(f"📹 TCP Packet: {tcp.sport} -> {tcp.dport}")
             # Video
             if tcp.dport == 8080 or tcp.sport == 8080:
                 logger.info(" *** VIDEO TRAFFIC CLASSIFIED ***")
