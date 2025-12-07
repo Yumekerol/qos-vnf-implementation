@@ -1,3 +1,4 @@
+import re
 import subprocess
 import time
 import json
@@ -53,27 +54,34 @@ def modify_police_config(config_name, voip_rate, video_rate, data_rate):
         print("✗ police.py not found!")
         return False
 
-    with open(police_path, 'r') as f:
+    with open(police_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    lines = content.split('\n')
-    new_lines = []
-
-    for line in lines:
-        if "'voip': TokenBucket(rate=" in line:
-            new_lines.append(
-                f"    'voip': TokenBucket(rate={voip_rate}, capacity={voip_rate * 2}),  # {voip_rate / 125000:.1f} Mbps")
-        elif "'video': TokenBucket(rate=" in line:
-            new_lines.append(
-                f"    'video': TokenBucket(rate={video_rate}, capacity={video_rate * 2}),  # {video_rate / 125000:.1f} Mbps")
-        elif "'data': TokenBucket(rate=" in line:
-            new_lines.append(
-                f"    'data': TokenBucket(rate={data_rate}, capacity={data_rate * 2}),  # {data_rate / 125000:.1f} Mbps")
+    def replacer(match):
+        key = match.group(1)
+        if key == 'voip':
+            rate = voip_rate
+            cap = voip_rate * 2
+        elif key == 'video':
+            rate = video_rate
+            cap = video_rate * 2
+        elif key == 'data':
+            rate = data_rate
+            cap = data_rate * 2
         else:
-            new_lines.append(line)
+            return match.group(0)
+            
+        return f"'{key}': TokenBucket(\n        rate={rate},      # {rate/125000:.1f} Mbps\n        capacity={cap}"
 
-    with open(police_path, 'w') as f:
-        f.write('\n'.join(new_lines))
+    pattern = re.compile(r"'((?:voip)|(?:video)|(?:data))':\s*TokenBucket\s*\(\s*rate=\d+.*?\s*capacity=\d+", re.DOTALL)
+    
+    new_content = pattern.sub(replacer, content)
+
+    if new_content == content:
+        print(f"⚠ Warning: No changes made to police.py for {config_name}. Regex mismatch?")
+    
+    with open(police_path, 'w', encoding='utf-8') as f:
+        f.write(new_content)
 
     print(f"✓ Modified police.py for config: {config_name}")
     print(f"  VoIP:  {voip_rate / 125000:.1f} Mbps")
@@ -84,7 +92,7 @@ def modify_police_config(config_name, voip_rate, video_rate, data_rate):
 
 
 def rebuild_policing_vnf():
-    print("\n🔄 Rebuilding policing VNF...")
+    print("\n Rebuilding policing VNF...")
 
     run_command("docker-compose stop vnf_policing")
     time.sleep(2)
@@ -94,8 +102,8 @@ def rebuild_policing_vnf():
     run_command("docker-compose up -d vnf_policing")
     time.sleep(5)
 
-    out = run_command("docker ps | grep vnf_policing", capture=True)
-    if out and "Up" in out:
+    out = run_command("docker ps", capture=True)
+    if out and "vnf_policing" in out and "Up" in out:
         print("✓ Policing VNF restarted successfully")
         return True
     else:
@@ -126,7 +134,6 @@ def run_test_scenario(config_name, results_dir, duration=30):
 
     clear_vnf_logs()
 
-    # Kill old processes
     containers = ["server", "client_voip", "client_video", "client_data"]
     for container in containers:
         run_command(f"docker exec {container} pkill -9 iperf3 2>/dev/null")
@@ -146,13 +153,8 @@ def run_test_scenario(config_name, results_dir, duration=30):
 
     print(f" Starting mixed traffic ({duration} seconds) in PRIORITY ORDER...")
 
-    # Clean old results
     for container in ["client_voip", "client_video", "client_data"]:
         run_command(f"docker exec {container} rm -f /tmp/*.json")
-
-    # ============================================================
-    # START IN PRIORITY ORDER: VoIP → Video → Data
-    # ============================================================
 
     print(" VoIP (UDP 150Kbps) starting...")
     run_command(
@@ -315,7 +317,6 @@ def analyze_config_results(results_dir, configs):
             elif data_change < -20:
                 print(f"    Data severely restricted ({data_change:.1f}%)")
 
-    # Save summary
     summary_path = results_dir / "optimization_summary.md"
     with open(summary_path, 'w') as f:
         f.write("# QoS Policing Optimization Analysis\n\n")
@@ -360,23 +361,11 @@ def main():
     print("🔬 QoS POLICING OPTIMIZATION TESTING")
     print("=" * 60)
 
-    # ============================================================
-    # CONFIGURAÇÕES BASEADAS NO TEU police.py ATUAL
-    # ============================================================
     configs = [
-        # Config A: ATUAL (2, 6, 1.5 Mbps) - ÓTIMO
         ("config_a_current_optimal", 250000, 750000, 187500),
-
-        # Config B: Mais generoso (3, 8, 2 Mbps)
         ("config_b_more_generous", 375000, 1000000, 250000),
-
-        # Config C: Mais restritivo (1.5, 5, 1 Mbps)
         ("config_c_more_restrictive", 187500, 625000, 125000),
-
-        # Config D: Prioridades invertidas (2, 4, 6 Mbps) - Data > Video
         ("config_d_inverted_priority", 250000, 500000, 750000),
-
-        # Config E: VoIP dominante (4, 5, 1 Mbps)
         ("config_e_voip_dominant", 500000, 625000, 125000),
     ]
 
@@ -397,8 +386,6 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\nResults directory: {results_dir}")
-
-    input("\nPress Enter to start optimization testing...")
 
     try:
         for i, (config_name, voip_rate, video_rate, data_rate) in enumerate(configs, 1):
@@ -441,7 +428,7 @@ def main():
         restore_police_py()
         rebuild_policing_vnf()
 
-    input("\nPress Enter to exit...")
+        input("\nPress Enter to exit...")
 
 
 if __name__ == "__main__":
