@@ -112,7 +112,7 @@ def process_packet(packet):
             else:
                 # Log mais agressivo para VoIP drops (NÃO DEVERIA ACONTECER!)
                 stats['voip_dropped'] += 1
-                logger.error(f"🔴 CRITICAL: VoIP packet DROPPED! Size={packet_size} bytes")
+                logger.error(f"! CRITICAL: VoIP packet DROPPED! Size={packet_size} bytes")
                 packet.drop()
         else:
             # Video e Data: policing normal
@@ -150,7 +150,7 @@ def main():
     logger.info("  - Video: 4 Mbps (500 KB/s) - MEDIUM PRIORITY")
     logger.info("  - Data:  2 Mbps (250 KB/s) - BEST EFFORT")
     logger.info("=" * 60)
-    logger.warning("⚠️  VoIP drops should be ZERO in all scenarios!")
+    logger.warning("!  VoIP drops should be ZERO in all scenarios!")
     logger.info("=" * 60)
 
     nfqueue = NetfilterQueue()
