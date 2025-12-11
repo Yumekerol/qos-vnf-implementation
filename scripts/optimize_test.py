@@ -362,11 +362,11 @@ def main():
     print("=" * 60)
 
     configs = [
-        ("config_a_current_optimal", 250000, 750000, 187500),
-        ("config_b_more_generous", 375000, 1000000, 250000),
-        ("config_c_more_restrictive", 187500, 625000, 125000),
-        ("config_d_inverted_priority", 250000, 500000, 750000),
-        ("config_e_voip_dominant", 500000, 625000, 125000),
+        ("config_a_current_optimal", 25000, 500000, 250000),     # VoIP=0.2, Video=4, Data=2 (Matches police.py)
+        ("config_b_more_generous", 37500, 750000, 375000),       # VoIP=0.3, Video=6, Data=3 (Higher limits)
+        ("config_c_more_restrictive", 18750, 375000, 125000),    # VoIP=0.15, Video=3, Data=1 (Strict)
+        ("config_d_inverted_priority", 25000, 250000, 750000),   # VoIP=0.2, Video=2, Data=6 (Inverted)
+        ("config_e_voip_dominant", 62500, 500000, 125000),       # VoIP=0.5, Video=4, Data=1 (High VoIP)
     ]
 
     print(f"\nThis will test {len(configs)} different configurations:")
