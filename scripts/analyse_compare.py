@@ -69,7 +69,6 @@ def analyze_scenario(scenario_path):
 
 
 def plot_throughput_comparison(with_policing, without_policing, output_dir):
-
     categories = ['VoIP', 'Video', 'Data']
 
     with_values = [
@@ -89,10 +88,14 @@ def plot_throughput_comparison(with_policing, without_policing, output_dir):
 
     fig, ax = plt.subplots(figsize=(12, 7))
 
+    # Darker colors for 'without' to match the original style, plus hatching
+    colors_with = ['#2ecc71', '#3498db', '#e74c3c']
+    colors_without = ['#27ae60', '#2980b9', '#c0392b']
+
     bars1 = ax.bar(x - width / 2, with_values, width, label='With Policing',
-                   color=['#2ecc71', '#3498db', '#e74c3c'], alpha=0.8, edgecolor='black')
+                   color=colors_with, alpha=0.9, edgecolor='black')
     bars2 = ax.bar(x + width / 2, without_values, width, label='Without Policing',
-                   color=['#27ae60', '#2980b9', '#c0392b'], alpha=0.8, edgecolor='black')
+                   color=colors_without, alpha=0.9, edgecolor='black', hatch='//')
 
     ax.set_xlabel('Traffic Type', fontsize=13, fontweight='bold')
     ax.set_ylabel('Throughput (Mbps)', fontsize=13, fontweight='bold')
@@ -100,10 +103,23 @@ def plot_throughput_comparison(with_policing, without_policing, output_dir):
                  fontsize=15, fontweight='bold', pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels(categories, fontsize=12)
-    ax.legend(fontsize=11, loc='upper right')
+    
+    # Custom Legend
+    import matplotlib.patches as mpatches
+    legend_handles = [
+        mpatches.Patch(facecolor='#2ecc71', edgecolor='black', label='VoIP (With Policing)'),
+        mpatches.Patch(facecolor='#27ae60', edgecolor='black', hatch='//', label='VoIP (Without Policing)'),
+        mpatches.Patch(facecolor='#3498db', edgecolor='black', label='Video (With Policing)'),
+        mpatches.Patch(facecolor='#2980b9', edgecolor='black', hatch='//', label='Video (Without Policing)'),
+        mpatches.Patch(facecolor='#e74c3c', edgecolor='black', label='Data (With Policing)'),
+        mpatches.Patch(facecolor='#c0392b', edgecolor='black', hatch='//', label='Data (Without Policing)')
+    ]
+    ax.legend(handles=legend_handles, fontsize=10, loc='upper right', ncol=2)
+    
     ax.grid(axis='y', alpha=0.3, linestyle='--')
 
-    for bars in [bars1, bars2]:
+    forbars = [bars1, bars2]
+    for bars in forbars:
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width() / 2., height,
@@ -178,7 +194,6 @@ def plot_voip_quality_comparison(with_policing, without_policing, output_dir):
 
 
 def plot_retransmissions_comparison(with_policing, without_policing, output_dir):
-
     categories = ['Video', 'Data']
 
     with_values = [
@@ -196,10 +211,13 @@ def plot_retransmissions_comparison(with_policing, without_policing, output_dir)
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
+    colors_with = ['#3498db', '#e74c3c']
+    colors_without = ['#2980b9', '#c0392b']
+
     bars1 = ax.bar(x - width / 2, with_values, width, label='With Policing',
-                   color=['#3498db', '#e74c3c'], alpha=0.8, edgecolor='black')
+                   color=colors_with, alpha=0.9, edgecolor='black')
     bars2 = ax.bar(x + width / 2, without_values, width, label='Without Policing',
-                   color=['#2980b9', '#c0392b'], alpha=0.8, edgecolor='black')
+                   color=colors_without, alpha=0.9, edgecolor='black', hatch='//')
 
     ax.set_xlabel('Traffic Type', fontsize=13, fontweight='bold')
     ax.set_ylabel('Retransmissions', fontsize=13, fontweight='bold')
@@ -207,7 +225,17 @@ def plot_retransmissions_comparison(with_policing, without_policing, output_dir)
                  fontsize=15, fontweight='bold', pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels(categories, fontsize=12)
-    ax.legend(fontsize=11)
+    
+    # Custom Legend
+    import matplotlib.patches as mpatches
+    legend_handles = [
+        mpatches.Patch(facecolor='#3498db', edgecolor='black', label='Video (With Policing)'),
+        mpatches.Patch(facecolor='#2980b9', edgecolor='black', hatch='//', label='Video (Without Policing)'),
+        mpatches.Patch(facecolor='#e74c3c', edgecolor='black', label='Data (With Policing)'),
+        mpatches.Patch(facecolor='#c0392b', edgecolor='black', hatch='//', label='Data (Without Policing)')
+    ]
+    ax.legend(handles=legend_handles, fontsize=10)
+    
     ax.grid(axis='y', alpha=0.3, linestyle='--')
 
     for bars in [bars1, bars2]:
