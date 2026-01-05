@@ -329,12 +329,24 @@ def analyze_config_results(results_dir, configs):
             f.write(f"- Data: {data / 125000:.1f} Mbps (capacity: {data * 2 / 125000:.1f} Mbps)\n\n")
 
         f.write("## Results Summary\n\n")
-        f.write("| Config | VoIP Loss (%) | Video (Mbps) | Data (Mbps) |\n")
-        f.write("|--------|---------------|--------------|-------------|\n")
+        
+        # Table 1: Quality Metrics (Loss & Jitter)
+        f.write("### Quality Metrics (Loss & Jitter)\n\n")
+        f.write("| Config | VoIP Loss (%) | VoIP Jitter (ms) |\n")
+        f.write("|--------|---------------|------------------|\n")
 
         for config_name in results:
             m = results[config_name]
-            f.write(f"| {config_name} | {m['voip_loss']:.2f} | {m['video_tp']:.2f} | {m['data_tp']:.2f} |\n")
+            f.write(f"| {config_name} | {m['voip_loss']:.2f} | {m['voip_jitter']:.2f} |\n")
+        
+        # Table 2: Throughput Performance
+        f.write("\n### Throughput Performance (Mbps)\n\n")
+        f.write("| Config | VoIP | Video | Data |\n")
+        f.write("|--------|------|-------|------|\n")
+
+        for config_name in results:
+            m = results[config_name]
+            f.write(f"| {config_name} | {m['voip_tp']:.3f} | {m['video_tp']:.2f} | {m['data_tp']:.2f} |\n")
 
         f.write("\n## Key Findings\n\n")
         f.write("### VoIP Protection\n")
